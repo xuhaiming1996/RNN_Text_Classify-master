@@ -98,6 +98,10 @@ class RNN_Model(object):
             output_from_sent_encode_doc.append(state_sent_encode_doc)
 
 
+
+
+
+        # 下面是解码阶段
         self.max_target_sen_num = tf.Variable(0, dtype=tf.int32, trainable=False)
         self.max_target_word_num = tf.Variable(0, dtype=tf.int32, trainable=False)
         self.trian_target_set = tf.placeholder(tf.int32,[self.batch_size, self.max_target_sen_num, self.max_target_word_num])
@@ -108,6 +112,11 @@ class RNN_Model(object):
 
         self.new_max_target_word_num = tf.placeholder(tf.int32, shape=[], name="new_max_target_word_num")
         self._max_target_word_num_update = tf.assign(self.max_target_word_num, self.new_max_target_word_num)
+
+
+
+
+
 
 
 
