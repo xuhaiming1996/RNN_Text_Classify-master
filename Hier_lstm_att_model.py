@@ -171,7 +171,7 @@ class RNN_Model(object):
                     h_t_target_word.append(state_sent_decode_word[-1][-1])
 
                 h_t_Target_sen.append(h_t_target_word)
-
+               #sjdhasdi hasi dhihsid hoisd
                 input_for_doc_decode_sent_at_tt = state_sent_encode_doc[-1][-1]  # 这个时间步的doc_decode_sent的输入
                 vs = []
                 for no_sen_2 in range(self.max_target_sen_num):
