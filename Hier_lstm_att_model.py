@@ -154,10 +154,11 @@ class RNN_Model(object):
         state_doc_decode_sent = output_from_sent_encode_doc                  #包含四层的ht 和 Ct
 
         #进行解码
-        h_t_target_sen=[]
-        h_t_target_word=[]
+        h_t_target_sen = []                                                    #保存在doc_decode_sent 中所有时间步的最后一层的ht
+        h_t_Target_sen = []                                                    #将sent_decode_word中的每一个时间步的最后一层的输出保存为一个元素 放在这个列表里面
         for no_sen in range(self.max_target_sen_num):
             state_sent_decode_word = state_doc_decode_sent
+            h_t_target_word = []
             with tf.variable_scope("sent_decode_word"):
                 for no_word in range(self.max_target_word_num):
                     if no_word > 0 or no_sen > 0:
@@ -167,6 +168,9 @@ class RNN_Model(object):
                                                                   sequence_length= length_array_input_for_sent_decode_word[no_sen],
                                                                   initial_state=state_sent_decode_word,
                                                                   time_major=False)
+                    h_t_target_word.append(state_sent_decode_word[-1][-1])
+
+                h_t_Target_sen.append(h_t_target_word)
 
                 input_for_doc_decode_sent_at_tt = state_sent_encode_doc[-1][-1]  # 这个时间步的doc_decode_sent的输入
                 vs = []
