@@ -16,7 +16,7 @@ FLAGS = flags.FLAGS
 
 
 flags.DEFINE_integer('batch_size',16,'the batch_size of the training procedure')
-flags.DEFINE_integer('vocabulary_size',25002,'vocabulary_size')
+flags.DEFINE_integer('vocabulary_size',25003,'vocabulary_size')              #25001是句子的结束符号 25002是文章的结束符号 所有的单词是1-25000 0不用
 flags.DEFINE_integer('emdedding_dim',1000,'embedding dim')
 flags.DEFINE_integer('hidden_neural_size',1000,'LSTM hidden neural size')
 flags.DEFINE_integer('hidden_layer_num',4,'LSTM hidden layer num')

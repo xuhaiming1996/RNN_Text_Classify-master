@@ -9,3 +9,4 @@ while stop==0:
     print(mask_train_source_set.shape)
     if stop!=1:
         print(mask_train_source_set[0][0])
+        print("sdasdasdas")

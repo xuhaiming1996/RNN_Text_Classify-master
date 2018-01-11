@@ -9,6 +9,8 @@ class RNN_Model(object):
     def __init__(self,config,is_training=True):
 
         self.batch_size=tf.Variable(0,dtype=tf.int32,trainable=False)
+
+        #这是编码阶段用到的函数
         self.max_source_sen_num=tf.Variable(0,dtype=tf.int32,trainable=False)
         self.max_source_word_num = tf.Variable(0, dtype=tf.int32, trainable=False)
 
@@ -46,6 +48,7 @@ class RNN_Model(object):
 
         input_for_word_encode_sent = []
         length_array_input_for_word_encode_sent = []
+
         # embedding layer 同时对mask_train_source_set进行处理获取[max_train_sent_num,]
         with tf.device("/cpu:0"), tf.name_scope("embedding_layer"):
             embedding = tf.get_variable("embedding", [vocabulary_size, embed_dim], dtype=tf.float32)
@@ -56,9 +59,10 @@ class RNN_Model(object):
 
 
 
+
         """下面是编码阶段"""
         output_from_word_encode_sent = []                                                 #单词到句子编码的输出
-        state_word_encode_sent = self._initial_state_word_encode_sent
+        state_word_encode_sent = self._initial_state_word_encode_sent                     #state.shape = [layer_num, 2, batch_size, hidden_size],
         with tf.Variable_scope("word_encode_sent"):
             for no_sen in range(self.max_train_source_sen_num):
                 for no_word in range(self.max_train_source_word_num):
@@ -71,17 +75,39 @@ class RNN_Model(object):
                                                                       time_major=False)
                 output_from_word_encode_sent.append(state_word_encode_sent[-1][1])       #state_word_encode_sent[-1][1]就是ht shape为[batch_size,hidden_dim]
 
+        trian_source_each_sent=[]           #相当于matlab的source_each_sent   里买你保存的c_t和h_t
+        output_from_sent_encode_doc = []  # 4层的要全部保存下来 包括c_t和h_t
+        state_sent_encode_doc = self._initial_state_sent_encode_doc
+        length_array_input_for_sent_encode_doc = []                      #就是一个list
+        for no_batch in range(self.batch_size):
+            sen_num = 0
+            for no_sen in range(self.max_source_sen_num):
+                sen_num+=self.mask_trian_source_set[no_sen][0][no_batch]
+            length_array_input_for_sent_encode_doc.append(sen_num)
 
-
-        output_from_sent_encode_doc=[]                               #4层的要全部保存下来 包括c_t和h_t
         with tf.variable_scope("sent_encode_doc"):
             for no_sen in range(self.max_train_source_sen_num):
                 if no_sen > 0:
                     tf.get_variable_scope().reuse_variables()
-                _, sent_state) = self.encode_sent_cell(output_for_sent_encode_doc[s], sent_state)
+                _, state_sent_encode_doc = tf.nn.dynamic_rnn(sent_encode_doc_cell,
+                                                              inputs=output_from_word_encode_sent[no_sen],
+                                                              sequence_length=length_array_input_for_sent_encode_doc,
+                                                              initial_state=state_sent_encode_doc,
+                                                              time_major=False)
+                trian_source_each_sent.append(state_sent_encode_doc)
+            output_from_sent_encode_doc.append(state_sent_encode_doc)
 
 
+        self.max_target_sen_num = tf.Variable(0, dtype=tf.int32, trainable=False)
+        self.max_target_word_num = tf.Variable(0, dtype=tf.int32, trainable=False)
+        self.trian_target_set = tf.placeholder(tf.int32,[self.batch_size, self.max_target_sen_num, self.max_target_word_num])
+        self.mask_trian_target_set = tf.placeholder(tf.int32, [self.max_target_sen_num, self.max_target_word_num,self.batch_size])
 
+        self.new_max_target_sen_num = tf.placeholder(tf.int32, shape=[], name="new_max_target_sen_num")
+        self._max_target_sen_num_update = tf.assign(self.max_target_sen_num, self.new_max_target_sen_num)
+
+        self.new_max_target_word_num = tf.placeholder(tf.int32, shape=[], name="new_max_target_word_num")
+        self._max_target_word_num_update = tf.assign(self.max_target_word_num, self.new_max_target_word_num)
 
 
 
@@ -185,7 +211,11 @@ class RNN_Model(object):
     def assign_new_max_source_word_num(self,session,max_source_word_num_value):
         session.run(self._max_source_word_num_update,feed_dict={self.new_max_source_word_num:max_source_word_num_value})
 
+    def assign_new_max_target_sen_num(self, session, max_target_sen_num_value):
+        session.run(self._max_target_sen_num_update, feed_dict={self.new_max_target_sen_num: max_target_sen_num_value})
 
+    def assign_new_max_target_word_num(self, session, max_target_word_num_value):
+        session.run(self._max_target_word_num_update, feed_dict={self.new_max_target_word_num: max_target_word_num_value})
 
 
 
