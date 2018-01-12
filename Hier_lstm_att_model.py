@@ -101,8 +101,6 @@ class RNN_Model(object):
 
 
 
-
-
         # 下面是解码阶段
         self.max_target_sen_num = tf.Variable(0, dtype=tf.int32, trainable=False)
         self.max_target_word_num = tf.Variable(0, dtype=tf.int32, trainable=False)
@@ -154,8 +152,8 @@ class RNN_Model(object):
         state_doc_decode_sent = output_from_sent_encode_doc                  #包含四层的ht 和 Ct
 
         #进行解码
-        h_t_target_sen = []                                                    #保存在doc_decode_sent 中所有时间步的最后一层的ht
-        h_t_Target_sen = []                                                    #将sent_decode_word中的每一个时间步的最后一层的输出保存为一个元素 放在这个列表里面
+        h_t_target_sen = []                                                    #保存在doc_decode_sent 中所有时间步的最后一层的ht 列表的长度就是文章的最大的句子数
+        h_t_Target_sen = []                                                    #将sent_decode_word中的每个时间步的最后一层的输出ht保存为一个元素 放在这个列表里面  所以这个列表的长度就是文章的最大句子数
         for no_sen in range(self.max_target_sen_num):
             state_sent_decode_word = state_doc_decode_sent
             h_t_target_word = []
@@ -168,11 +166,11 @@ class RNN_Model(object):
                                                                   sequence_length= length_array_input_for_sent_decode_word[no_sen],
                                                                   initial_state=state_sent_decode_word,
                                                                   time_major=False)
-                    h_t_target_word.append(state_sent_decode_word[-1][-1])
+                    h_t_target_word.append(state_sent_decode_word[-1][-1])                   #只保存最后一层的h
 
                 h_t_Target_sen.append(h_t_target_word)
                #sjdhasdi hasi dhihsid hoisd
-                input_for_doc_decode_sent_at_tt = state_sent_encode_doc[-1][-1]  # 这个时间步的doc_decode_sent的输入
+                input_for_doc_decode_sent_at_tt = state_sent_decode_word[-1][-1]  # 这个时间步的doc_decode_sent的输入
                 vs = []
                 for no_sen_2 in range(self.max_target_sen_num):
                     with tf.variable_scope("decode_RNN_attention"):
@@ -202,8 +200,19 @@ class RNN_Model(object):
                                                                  time_major=False)
 
                 state_doc_decode_sent = state_doc_decode_sent
-                h_t_target_sen.append(state_sent_encode_doc[-1][-1])
+                h_t_target_sen.append(state_doc_decode_sent[-1][-1])
                 
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -284,4 +293,3 @@ class RNN_Model(object):
 
     def assign_new_max_target_word_num(self, session, max_target_word_num_value):
         session.run(self._max_target_word_num_update, feed_dict={self.new_max_target_word_num: max_target_word_num_value})
-
