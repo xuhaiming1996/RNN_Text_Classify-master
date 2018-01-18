@@ -149,13 +149,12 @@ class RNN_Model(object):
         state_doc_decode_sent = output_from_sent_encode_doc                  #包含四层的ht 和 Ct
 
         #进行解码%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        h_t_target_sen = []                                                    #保存在doc_decode_sent 中所有时间步的最后一层的ht 列表的长度就是文章的最大的句子数
-        h_t_Target_sen = []                                                    #将sent_decode_word中的每个时间步的最后一层的输出ht保存为一个元素 放在这个列表里面  所以这个列表的长度就是文章的最大句子数
+        h_t_target_sen = [] #保存在doc_decode_sent 中所有时间步的最后一层的ht 列表的长度就是文章的最大的句子数  整体的shape是[max_sen_time,batch_size,cell_state_size]
+        h_t_Target_sen = []  #将sent_decode_word中的每个时间步的最后一层的输出ht保存为一个元素 放在这个列表里面  所以这个列表的长度就是文章的最大句子数 整体的shape是[max_sen_time,batch_size, max_word_time, cell_state_size]
         train_source_each_sent=tf.transpose(train_source_each_sent, [1,0,2])   #现在train_source_each_sent的shapes是[max_time,batch_size,cell_state_size]
-        sen_mask=tf.transpose(self.sen_mask,[1,0])     #shape是[max_sen_time,batch_size]
+        sen_mask = tf.transpose(self.sen_mask,[1,0])     #shape是[max_sen_time,batch_size]
         for no_sen in range(self.max_target_sen_num):
             state_sent_decode_word = state_doc_decode_sent
-            h_t_target_word = []
             with tf.variable_scope("sent_decode_word"):
                 if no_sen > 0:
                     tf.get_variable_scope().reuse_variables()
@@ -164,8 +163,9 @@ class RNN_Model(object):
                                                                   sequence_length= length_array_input_for_sent_decode_word[no_sen],
                                                                   initial_state=state_sent_decode_word,
                                                                   time_major=False)
-                h_t_Target_sen.append(outputs)  #每一个outputs的shape都是[batch_size, max_time, cell_state_size] padding位置上的输出全是0
+                h_t_Target_sen.append(outputs)  #每一个outputs的shape都是[batch_size, max_word_time, cell_state_size] padding位置上的输出全是0
                 input_for_doc_decode_sent_at_tt = state_sent_decode_word[-1][-1]  # 这个时间步的doc_decode_sent的输入
+
                 vs = []
                 for no_sen_2 in range(self.max_target_sen_num):
                     with tf.variable_scope("decode_RNN_attention"):
@@ -187,28 +187,58 @@ class RNN_Model(object):
                 with tf.variable_scope("doc_decode_sent"):
                     if no_sen > 0:
                         tf.get_variable_scope().reuse_variables()
+
+                    for no_lay in range(hidden_layer_num):
+                        state_doc_decode_sent = state_doc_decode_sent[no_lay][0] * tf.transpose(sen_mask[no_sen],[1,0])
+                        state_doc_decode_sent = state_doc_decode_sent[no_lay][1] * tf.transpose(sen_mask[no_sen],[1, 0])
+
                     sent_decode = tf.concat(1, [input_for_doc_decode_sent_at_tt*tf.transpose(sen_mask[no_sen],[1,0]), mt])  # 16X2000
                     output, state_doc_decode_sent = doc_decode_sent_cell(sent_decode, state_doc_decode_sent)
-                    output=output*tf.transpose(sen_mask[no_sen],[1,0])
-                    for no_lay in range(hidden_layer_num):
-                        state_doc_decode_sent = state_doc_decode_sent[no_lay][0]*tf.transpose(sen_mask[no_sen],[1,0])
-                        state_doc_decode_sent = state_doc_decode_sent[no_lay][1] * tf.transpose(sen_mask[no_sen], [1, 0])
 
-                    h_t_target_sen.append(output)
+                    h_t_target_sen.append(output)  #output的shape是[batchsize,cell_state_size] padding的位置都是0
 
 
+        word_decodes = []
+        #计算误差
+        for no_sen in range(self.max_target_sen_num):
+            if no_sen==0:
+                h_t_1=output_from_sent_encode_doc[-1][-1]  #16X1000
+            else
+                h_t_1=h_t_target_sen[no_sen-1]
+            word_decodes.append(h_t_1)
+            # 获取第no_sen句子的在word水平的解码的输出
+            target_sen = h_t_Target_sen[no_sen]  # shape是[batch_size, max_word_time, cell_state_size]
+            target_sen = tf.transpose(target_sen,perm=[1, 0, 2])  # shape是[max_word_time,batch_size,cell_state_size]
+            for no_word in range(self.max_target_word_num-1):
+                word_decodes.append(target_sen[no_word])
 
+        w = tf.get_variable("w", [hidden_neural_size, vocabulary_size])
+        b = tf.get_variable("b", [vocabulary_size])
 
+        def sampled_loss(inputs, labels):
+            labels = tf.reshape(labels, [-1, 1])
+            return tf.nn.sampled_softmax_loss(tf.transpose(w), b, inputs,
+                                              labels, self.num_samples,
+                                              vocabulary_size)
 
-        #
-        soft_w = tf.get_variable("w", [self.size, self.vocab_size])
-        soft_b = tf.get_variable("b", [self.vocab_size])
+        targets = tf.reshape(self.train_target_set, [self.batch_size, self.max_target_sen_num * self.max_target_word_num])
+        targets = [targets[:, i] for i in range(self.max_target_sen_num * self.max_target_word_num)]
+        #下面这个是每个单词是否存在
+        weights = [tf.ones([self.batch_size]) for _ in range(self.max_target_sen_num * self.max_target_word_num)]
+        loss = tf.nn.seq2seq.sequence_loss_by_example(word_decodes, targets, weights,
+                                                      softmax_loss_function=sampled_loss)
+
+        self.cost = tf.reduce_sum(loss) / self.batch_size
+        self.optim = tf.train.GradientDescentOptimizer(0.01).minimize(self.cost,
+                                                                      aggregation_method=tf.AggregationMethod.EXPERIMENTAL_TREE)
+        tf.scalar_summary("cost", self.cost)
+
 
 
         with tf.name_scope("Softmax_layer_and_output"):
-            softmax_w = tf.get_variable("softmax_w",[hidden_neural_size,class_num],dtype=tf.float32)
-            softmax_b = tf.get_variable("softmax_b",[class_num],dtype=tf.float32)
-            self.logits = tf.matmul(out_put,softmax_w)+softmax_b
+            softmax_w = tf.get_variable("softmax_w",[hidden_neural_size,vocabulary_size],dtype=tf.float32)
+            softmax_b = tf.get_variable("softmax_b",[vocabulary_size],dtype=tf.float32)
+            self.logits = tf.matmul(out_put,softmax_w)
 
         with tf.name_scope("loss"):
             self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits+1e-10,self.target)
