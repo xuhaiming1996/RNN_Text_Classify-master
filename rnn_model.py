@@ -56,7 +56,7 @@ class RNN_Model(object):
 
         with tf.name_scope("mean_pooling_layer"):
 
-            out_put=tf.reduce_sum(out_put,0)/(tf.reduce_sum(self.mask_x,0)[:,None])
+            out_put=tf.reduce_sum(out_put,0)/(tf.reduce_sum(self.mask_x,0) [:,None])
 
         with tf.name_scope("Softmax_layer_and_output"):
             softmax_w = tf.get_variable("softmax_w",[hidden_neural_size,class_num],dtype=tf.float32)
