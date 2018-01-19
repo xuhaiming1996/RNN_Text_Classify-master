@@ -2,7 +2,7 @@
 import tensorflow as tf
 
 class RNN_Model(object):
-    def __init__(self,config,is_training=True):
+    def __init__(self,config):
 
         self.batch_size=tf.Variable(0,dtype=tf.int32,trainable=False)
         #这是编码阶段用到的
@@ -199,7 +199,7 @@ class RNN_Model(object):
         for no_sen in range(self.max_target_sen_num):
             if no_sen==0:
                 h_t_1=output_from_sent_encode_doc[-1][-1]  #16X1000
-            else
+            else:
                 h_t_1=h_t_target_sen[no_sen-1]
 
             word_decodes.append(h_t_1)
@@ -257,3 +257,54 @@ class RNN_Model(object):
 
     def assign_new_max_target_word_num(self, session, max_target_word_num_value):
         session.run(self._max_target_word_num_update, feed_dict={self.new_max_target_word_num: max_target_word_num_value})
+
+
+
+    def get_model_dir(self):
+        model_name = type(self).__name__ or "Reader"
+        return "{}_{}".format(model_name, self.batch_size), model_name
+
+
+    def save(self, sess):
+        self.saver = tf.train.Saver()
+        print("Saving checkpoints...")
+        model_dir, model_name = self.get_model_dir()
+        checkpoint_dir = os.path.join(self.checkpoint_dir, model_dir)
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
+        self.saver.save(sess, os.path.join(checkpoint_dir, model_name))
+
+    def load(self, sess, checkpoint_dir):
+        model_dir, model_name = self.get_model_dir()
+        checkpoint_dir = os.path.join(self.checkpoint_dir, model_dir)
+        self.saver = tf.train.Saver()
+
+        print("Loading checkpoints...")
+        ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+            self.saver.restore(sess, os.path.join(checkpoint_dir, ckpt_name))
+            return True
+        return False
+
+
+    def train(self, sess, iterator, iterations=8, save_iters=1):
+        model_dir, model_name = self.get_model_dir()
+        sess.run(tf.initialize_all_variables())
+        i = 0
+        for x,y in iterator(data_path, self.vocab, self.sent_steps,
+                            self.doc_steps, batch_size=self.batch_size):
+            outputs = sess.run(self.logits + [self.optim, merged_sum],
+                               {self.input_data: x, self.output_data: y})
+            logits      = outputs[:-2]
+
+            if i % save_iters == 0 and i != 0:
+                self.save(sess)
+
+            if i == iterations:
+                return
+
+            if i % 10 == 0:
+                print("Iteration: {}".format(i))
+
+            i += 1

@@ -1,35 +1,41 @@
 import data_helper_source
-
+import  data_helper_target
 # file_source="##源文件##"
 # file_target="###目标文件###"
-
+from  Hier_lstm_att_model_update import RNN_Model
 import tensorflow as tf
 import numpy as np
 import os
 import time
 import datetime
-from rnn_model import RNN_Model
 
 
 flags =tf.app.flags
 FLAGS = flags.FLAGS
 
-
+flags.DEFINE_float('lr',0.1,'the learning rate')
 flags.DEFINE_integer('batch_size',16,'the batch_size of the training procedure')
 flags.DEFINE_integer('vocabulary_size',25003,'vocabulary_size')              #25001是句子的结束符号 25002是文章的结束符号 所有的单词是1-25000 0不用
 flags.DEFINE_integer('emdedding_dim',1000,'embedding dim')
 flags.DEFINE_integer('hidden_neural_size',1000,'LSTM hidden neural size')
 flags.DEFINE_integer('hidden_layer_num',4,'LSTM hidden layer num')
 flags.DEFINE_float('initial',0.08,'init initial')    #这个初始化参数的范围1---
-flags.DEFINE_integer('num_epoch',7,'num epoch')
+flags.DEFINE_integer('num_epoch',8,'num epoch')
 flags.DEFINE_integer('max_decay_epoch',30,'num epoch')
 flags.DEFINE_integer('max_grad_norm',5,'max_grad_norm')
+
 flags.DEFINE_string('out_dir',os.path.abspath(os.path.join(os.path.curdir,"runs")),'output directory')
-flags.DEFINE_integer('check_point_every',10,'checkpoint every num epoch ')
-flags.DEFINE_integer('max_source_sen_num',-1,'最大的句子数')
-flags.DEFINE_integer('max_source_word_num',-1,'最长的一句话包含的单词数')
-flags.DEFINE_string('source_dir',#,'源文件的路径')
-flags.DEFINE_string('target_dir',#,'目标文件的路径')
+
+flags.DEFINE_integer('check_point_every',1,'checkpoint every num epoch ')  #每几次保存数据
+
+flags.DEFINE_integer('max_source_sen_num',-1,'源文件最大的句子数')
+flags.DEFINE_integer('max_source_word_num',-1,'源文件最长的一句话包含的单词数')
+
+flags.DEFINE_integer('max_target_sen_num' , -1 , '源文件最大的句子数')
+flags.DEFINE_integer('max_target_word_num' ,-1 , '源文件最长的一句话包含的单词数')
+
+flags.DEFINE_string('source_dir','data/train_source','path of train_source')
+flags.DEFINE_string('target_dir','data/train_target','path of train_target')
 
 
 class Config(object):                           #配置模型需要的参数  这个里面只存放和模型相关的参数
@@ -43,150 +49,96 @@ class Config(object):                           #配置模型需要的参数  �
     num_epoch = FLAGS.num_epoch
     out_dir=FLAGS.out_dir
     checkpoint_every = FLAGS.check_point_every
+    lr = FLAGS.lr
     max_source_sen_num=FLAGS.max_source_sen_num
     max_source_word_num=FLAGS.max_source_word_num
+    max_target_sen_num = FLAGS.max_target_sen_num
+    max_target_word_num = FLAGS.max_target_word_num
+    batch_size=FLAGS.batch_size
 
 
 
-def evaluate(model,session,data,global_steps=None,summary_writer=None):
+def run_batch(session,feed_dict,fetches,global_steps):
+    cost,_ = session.run(fetches, feed_dict)
+    return cost
 
 
-    correct_num=0
-    total_num=len(data[0])
-    for step, (x,y,mask_x) in enumerate(data_helper.batch_iter(data,batch_size=FLAGS.batch_size)):
-
-         fetches = model.correct_num
-         feed_dict={}
-         feed_dict[model.input_data]=x
-         feed_dict[model.target]=y
-         feed_dict[model.mask_x]=mask_x
-         model.assign_new_batch_size(session,len(x))
-         state = session.run(model._initial_state)
-         for i , (c,h) in enumerate(model._initial_state):
-            feed_dict[c]=state[i].c
-            feed_dict[h]=state[i].h
-         count=session.run(fetches,feed_dict)
-         correct_num+=count
-
-    accuracy=float(correct_num)/total_num
-    dev_summary = tf.scalar_summary('dev_accuracy',accuracy)
-    dev_summary = session.run(dev_summary)
-    if summary_writer:
-        summary_writer.add_summary(dev_summary,global_steps)
-        summary_writer.flush()
-    return accuracy
-
-def run_epoch(model,session,data,global_steps,valid_model,valid_data,train_summary_writer,valid_summary_writer=None):
-    for step, (x,y,mask_x) in enumerate(data_helper.batch_iter(data,batch_size=FLAGS.batch_size)):
-
-        feed_dict={}
-        feed_dict[model.input_data]=x
-        feed_dict[model.target]=y
-        feed_dict[model.mask_x]=mask_x
-        model.assign_new_batch_size(session,len(x))
-        fetches = [model.cost,model.accuracy,model.train_op,model.summary]
-        state = session.run(model._initial_state)
-        for i , (c,h) in enumerate(model._initial_state):
-            feed_dict[c]=state[i].c
-            feed_dict[h]=state[i].h
-        cost,accuracy,_,summary = session.run(fetches,feed_dict)
-        train_summary_writer.add_summary(summary,global_steps)
-        train_summary_writer.flush()
-        valid_accuracy=evaluate(valid_model,session,valid_data,global_steps,valid_summary_writer)
-        if(global_steps%100==0):
-            print("the %i step, train cost is: %f and the train accuracy is %f and the valid accuracy is %f"%(global_steps,cost,accuracy,valid_accuracy))
-        global_steps+=1
-
-    return global_steps
-
-
-
-
-
-def train_step():
-
+def train():
     print("loading the dataset...")
     config = Config()
-    global_steps=1
-    stop=0
+    stop_source = 0
+    stop_target = 0
     with tf.Graph().as_default(), tf.Session() as session:
         initializer = tf.random_uniform_initializer(-1 * FLAGS.initial, 1 * FLAGS.initial)
-    for i in config.num_epoch:
-        f_source=open(FLAGS.source_dir) #获取源文件的文件指针
-        f_target=open(FLAGS.target_dir)
-
-        while stop==0:#当整个文件还没结束....
-            train_source_set, mask_train_source_set, length_array_eachdoc_source, max_source_sen_num, max_source_word_num, batch_size,f_source,stop=data_helper_source.load_data(f_source,config.batch_size)
-            if stop==1: #为了防止特殊情况，最后一个batch不进行计算 同时又可以保证我们所有的batch_size都是一样的
-                f_source.close()
-                f_target.close()
-                break
-
-            config.max_source_sen_num=max_source_sen_num
-            config.max_source_word_num=max_source_word_num
-
-
-
-
-
-    with tf.Graph().as_default(), tf.Session() as session:
-
-        with tf.variable_scope("model",reuse=None,initializer=initializer):
+        with tf.variable_scope("model",initializer=initializer):
             model = RNN_Model(config=config,is_training=True)
-
-        with tf.variable_scope("model",reuse=True,initializer=initializer):
-            valid_model = RNN_Model(config=eval_config,is_training=False)
-            test_model = RNN_Model(config=eval_config,is_training=False)
-
-        #add summary
-        # train_summary_op = tf.merge_summary([model.loss_summary,model.accuracy])
-        train_summary_dir = os.path.join(config.out_dir,"summaries","train")
-        train_summary_writer =  tf.train.SummaryWriter(train_summary_dir,session.graph)
-
-        # dev_summary_op = tf.merge_summary([valid_model.loss_summary,valid_model.accuracy])
-        dev_summary_dir = os.path.join(eval_config.out_dir,"summaries","dev")
-        dev_summary_writer =  tf.train.SummaryWriter(dev_summary_dir,session.graph)
-
-        #add checkpoint
+        # add checkpoint
+        print("######################################")
         checkpoint_dir = os.path.abspath(os.path.join(config.out_dir, "checkpoints"))
         checkpoint_prefix = os.path.join(checkpoint_dir, "model")
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         saver = tf.train.Saver(tf.all_variables())
-
-
         tf.initialize_all_variables().run()
-        global_steps=1
-        begin_time=int(time.time())
+        global_steps = 1
 
-        for i in range(config.num_epoch):
-            print("the %d epoch training..."%(i+1))
-            lr_decay = config.lr_decay ** max(i-config.max_decay_epoch,0.0)
-            model.assign_new_lr(session,config.lr*lr_decay)
-            global_steps=run_epoch(model,session,train_data,global_steps,valid_model,valid_data,train_summary_writer,dev_summary_writer)
+        for i in config.num_epoch:
+            f_source=open(FLAGS.source_dir,'r',encoding="UTF-8") #获取源文件的文件指针
+            f_target=open(FLAGS.target_dir,'r',encoding="UTF-8") #获得目标文件的指针
+            num_batch=0 #用于记录这次迭代中的batch的个数
+            while stop_source==0 and stop_target==0:#当整个文件还没结束....
+                train_source_set, mask_train_source_set, length_array_eachdoc_source, max_source_sen_num, max_source_word_num, batch_size_source, f_source, stop_source ,sen_mask_source = data_helper_source.load_data(f_source, config.batch_size)
+                train_target_set, mask_train_target_set, length_array_eachdoc_target, max_target_sen_num, max_target_word_num, batch_size_target, f_target, stop_target ,sen_mask_target = data_helper_target.load_data(f_target, config.batch_size)
+                if stop_source == 1 or stop_target == 1: #为了防止特殊情况，最后一个batch不进行计算 同时又可以保证我们所有的batch_size都是一样的
+                    f_source.close()
+                    f_target.close()
+                    break
+                config.max_source_sen_num=max_source_sen_num
+                config.max_source_word_num=max_source_word_num
+                config.max_target_sen_num = max_source_sen_num
+                config.max_target_word_num = max_source_word_num
+                if batch_size_source == batch_size_target:
+                    #数据读取正常
+                    print("the %d epoch training..." % (i + 1))
+                    num_batch += 1
+                    model.assign_new_lr(session, config.lr)
 
-            if i% config.checkpoint_every==0:
-                path = saver.save(session,checkpoint_prefix,global_steps)
+
+                    model.assign_new_max_source_word_num(session,max_source_word_num)
+                    model.assign_new_max_source_sen_num(session,max_source_sen_num)
+
+                    model.assign_new_max_target_word_num(session,max_target_word_num)
+                    model.assign_new_max_target_sen_num(session,max_target_sen_num)
+                    feed_dict = {}
+                    feed_dict[model.sen_mask] = sen_mask_source
+
+                    feed_dict[model.train_source_set] = train_source_set
+                    feed_dict[model.mask_train_source_set] = mask_train_source_set
+
+                    feed_dict[model.train_target_set] = train_target_set
+                    feed_dict[model.mask_train_target_set] = mask_train_target_set
+
+                    fetches = [model.cost, model.train_op]
+                    cost = run_batch(session,feed_dict,fetches,global_steps)
+                    print("cost_debug:",cost)
+                    if num_batch % 1000 == 0:#在每次迭代中没1000个batch保存一次参数
+                        path = saver.save(session, checkpoint_prefix, global_steps)
+                        print("num_bath_%i of %i ecpo, Saved model chechpoint to %s\n" % (num_batch,global_steps,path))
+                        print("num_bath_%i of %i ecpo, train cost is: %f" % (num_batch,global_steps,cost))
+
+                else:
+                    print("这次读取的数据异常，出现batch_size_source==batch_size_target")
+
+            if i % config.checkpoint_every == 0:#数据遍历结束后 保存数组
+                path = saver.save(session, checkpoint_prefix, global_steps)
                 print("Saved model chechpoint to{}\n".format(path))
+            global_steps+=1
 
-        print("the train is finished")
-        end_time=int(time.time())
-        print("training takes %d seconds already\n"%(end_time-begin_time))
-        test_accuracy=evaluate(test_model,session,test_data)
-        print("the test data accuracy is %f"%test_accuracy)
         print("program end!")
 
-
-
 def main(_):
-    train_step()
+    train()
 
 
 if __name__ == "__main__":
     tf.app.run()
-
-
-
-
-
-

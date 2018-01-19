@@ -5,11 +5,10 @@ import numpy as np
 class RNN_Model(object):
 
 
-
     def __init__(self,config,is_training=True):
 
-        self.keep_prob=config.keep_prob
-        self.batch_size=tf.Variable(0,dtype=tf.int32,trainable=False)
+        self.keep_prob = config.keep_prob
+        self.batch_size = tf.Variable(0,dtype=tf.int32,trainable=False)
 
         num_step=config.num_step
         self.input_data=tf.placeholder(tf.int32,[None,num_step])
@@ -44,19 +43,19 @@ class RNN_Model(object):
         if self.keep_prob<1:
             inputs = tf.nn.dropout(inputs,self.keep_prob)
 
-        out_put=[]
-        state=self._initial_state
+        out_put = []
+        state = self._initial_state
         with tf.variable_scope("LSTM_layer"):
             for time_step in range(num_step):
                 if time_step>0: tf.get_variable_scope().reuse_variables()
                 (cell_output,state)=cell(inputs[:,time_step,:],state)
                 out_put.append(cell_output)
 
-        out_put=out_put*self.mask_x[:,:,None]
+        out_put = out_put*self.mask_x[:,:,None]
 
         with tf.name_scope("mean_pooling_layer"):
 
-            out_put=tf.reduce_sum(out_put,0)/(tf.reduce_sum(self.mask_x,0) [:,None])
+            out_put=tf.reduce_sum(out_put,0)/(tf.reduce_sum(self.mask_x,0)[:,None])
 
         with tf.name_scope("Softmax_layer_and_output"):
             softmax_w = tf.get_variable("softmax_w",[hidden_neural_size,class_num],dtype=tf.float32)

@@ -5,7 +5,7 @@ date:8/1/2017
 """
 
 import numpy as np
-import cPickle as pkl
+import pickle as pkl
 
 #file path
 dataset_path='data/subj0.pkl'

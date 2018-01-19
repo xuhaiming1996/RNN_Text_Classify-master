@@ -73,29 +73,20 @@ def read_file(f,batch_size,vocabulary_size):
 
 
 
-
+def padding_and_generate_mask(train_target_set,new_train_target_set,mask_train_target_set,length_array_eachdoc_target,sen_mask):
+    for i,article in enumerate(train_target_set):
+        for j,sent in enumerate(article):
+            new_train_target_set[i][j,0:length_array_eachdoc_target[i][j]]=sent
+            mask_train_target_set[j][0:length_array_eachdoc_target[i][j],i]=1
+            sen_mask[i][j]=1
+    return new_train_target_set,mask_train_target_set,sen_mask
 
 def load_data(f,batch_size):
     train_target_set, length_array_eachdoc_target, max_target_sen_num, max_target_word_num, batch_size, f,stop=read_file(f,batch_size,vocabulary_size)
 
-
-    # if stop==1:#为了防止特殊情况 文件的最后一个batch 都不处理 这样可以完全保证batch_size等于我们设定的
-    #     return
-
     new_train_target_set=np.ones([batch_size,max_target_sen_num,max_target_word_num],dtype=np.int32) #生成的是矩阵
-
     mask_train_target_set=np.zeros([max_target_sen_num,max_target_word_num,batch_size],dtype=np.int32)
+    sen_mask = np.zeros([batch_size, max_source_sen_num],dtype=np.int32)
 
-
-    def padding_and_generate_mask(train_target_set,new_train_target_set,mask_train_target_set,length_array_eachdoc_target):
-        for i,article in enumerate(train_target_set):
-            for j,sent in enumerate(article):
-                new_train_target_set[i][j,0:length_array_eachdoc_target[i][j]]=sent
-                mask_train_target_set[j][0:length_array_eachdoc_target[i][j],i]=1
-
-        return new_train_target_set,mask_train_target_set
-
-    train_target_set,mask_train_target_set=padding_and_generate_mask(train_target_set,new_train_target_set,mask_train_target_set,length_array_eachdoc_target)  #(new_train_target_set,mask_train_target_set)
-
-
-    return (np.array(train_target_set),np.array(mask_train_target_set),length_array_eachdoc_target, max_target_sen_num, max_target_word_num, batch_size,f,stop)
+    train_target_set,mask_train_target_set,sen_mask=padding_and_generate_mask(train_target_set,new_train_target_set,mask_train_target_set,length_array_eachdoc_target,sen_mask)  #(new_train_target_set,mask_train_target_set,sen_mask)
+    return (np.array(train_target_set),np.array(mask_train_target_set),length_array_eachdoc_target, max_target_sen_num, max_target_word_num, batch_size,f,stop,np.array(sen_mask))

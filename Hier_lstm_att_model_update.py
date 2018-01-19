@@ -2,22 +2,25 @@
 import tensorflow as tf
 
 class RNN_Model(object):
-    def __init__(self,config):
-
-        self.batch_size=tf.Variable(0,dtype=tf.int32,trainable=False)
+    def __init__(self,config,is_training=True):
+        self.batch_size=config.batch_size
+        # self.batch_size = tf.Variable(0,dtype=tf.int32,trainable=False)
         hidden_neural_size = config.hidden_neural_size  # 隐藏层神经元的的个数
         vocabulary_size = config.vocabulary_size  # 单词的个数
         embed_dim = config.embed_dim  # word2Vec的的维度
         hidden_layer_num = config.hidden_layer_num  # 神经元的层数
-        max_grad_norm=config.max_grad_norm
-        self.sen_mask = tf.placeholder(tf.int32, [self.batch_size, self.max_source_sen_num])       #这个变量准备一下。。。。。。。
-        self.new_batch_size = tf.placeholder(tf.int32, shape=[], name="new_batch_size")
-        self._batch_size_update = tf.assign(self.batch_size, self.new_batch_size)
+        max_grad_norm =config.max_grad_norm
+        # self.new_batch_size = tf.placeholder(tf.int32, shape=[], name="new_batch_size")
+        # self._batch_size_update = tf.assign(self.batch_size, self.new_batch_size)
         #这是编码阶段用到的
-        self.max_source_sen_num=tf.Variable(0,dtype=tf.int32,trainable=False)
+        self.max_source_sen_num = tf.Variable(0,  dtype=tf.int32,trainable=False)
         self.max_source_word_num = tf.Variable(0, dtype=tf.int32, trainable=False)
-        self.train_source_set=tf.placeholder(tf.int32,[self.batch_size,self.max_source_sen_num,self.max_source_word_num])
-        self.mask_train_source_set = tf.placeholder(tf.int32,[self.max_source_sen_num,self.max_source_word_num,self.batch_size])
+
+        self.train_source_set=tf.placeholder(tf.int32,[None,None,None])
+        # self.train_source_set=tf.placeholder(tf.int32,[self.batch_size,self.max_source_sen_num,self.max_source_word_num])
+        print("sasdadadad")
+        self.mask_train_source_set = tf.placeholder(tf.int32, [None,None,None])
+        # self.mask_train_source_set = tf.placeholder(tf.int32,[self.max_source_sen_num,self.max_source_word_num,self.batch_size])
         self.new_max_source_sen_num=tf.placeholder(tf.int32,shape=[],name="new_max_source_sen_num")
         self._max_source_sen_num_update=tf.assign(self.max_source_sen_num,self.new_max_source_sen_num)
         self.new_max_source_word_num = tf.placeholder(tf.int32, shape=[], name="new_max_source_word_num")
@@ -26,15 +29,21 @@ class RNN_Model(object):
         #解码阶段用到的
         self.max_target_sen_num = tf.Variable(0, dtype=tf.int32, trainable=False)
         self.max_target_word_num = tf.Variable(0, dtype=tf.int32, trainable=False)
-        self.train_target_set = tf.placeholder(tf.int32,[self.batch_size, self.max_target_sen_num, self.max_target_word_num])
-        self.mask_train_target_set = tf.placeholder(tf.int32, [self.max_target_sen_num, self.max_target_word_num,
-                                                               self.batch_size])
+
+        self.train_target_set = tf.placeholder(tf.int32,[None,None,None])
+        # self.train_target_set = tf.placeholder(tf.int32,[self.batch_size, self.max_target_sen_num, self.max_target_word_num])
+        self.mask_train_target_set = tf.placeholder(tf.int32, [None,None,None])
+        # self.mask_train_target_set = tf.placeholder(tf.int32, [self.max_target_sen_num, self.max_target_word_num,self.batch_size])
         self.new_max_target_sen_num = tf.placeholder(tf.int32, shape=[], name="new_max_target_sen_num")
         self._max_target_sen_num_update = tf.assign(self.max_target_sen_num, self.new_max_target_sen_num)
 
         self.new_max_target_word_num = tf.placeholder(tf.int32, shape=[], name="new_max_target_word_num")
         self._max_target_word_num_update = tf.assign(self.max_target_word_num, self.new_max_target_word_num)
 
+
+        self.sen_mask = tf.placeholder(tf.int32, [None,None])       #这个变量准备一下。。。。。。。
+        # self.sen_mask = tf.placeholder(tf.int32, [self.batch_size, self.max_source_sen_num])       #这个变量准备一下。。。。。。。
+        print("sssssssssssssssssssss")
         #build encoder_LSTM cell
         word_encode_sent_basic_lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(hidden_neural_size, forget_bias=0.0,  state_is_tuple=True)
         sent_encode_doc_basic_lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(hidden_neural_size, forget_bias=0.0,   state_is_tuple=True)
@@ -204,7 +213,6 @@ class RNN_Model(object):
             self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits+1e-10,targets)
             self.cost = tf.reduce_sum(self.loss*weights)/self.batch_size
 
-        self.globle_step = tf.Variable(0,name="globle_step",trainable=False)
         self.lr = tf.Variable(0.0,trainable=False)
 
         tvars = tf.trainable_variables()
@@ -222,8 +230,8 @@ class RNN_Model(object):
     def assign_new_lr(self,session,lr_value):
         session.run(self._lr_update,feed_dict={self.new_lr:lr_value})
 
-    def assign_new_batch_size(self,session,batch_size_value):
-        session.run(self._batch_size_update,feed_dict={self.new_batch_size:batch_size_value})
+    # def assign_new_batch_size(self,session,batch_size_value):
+    #     session.run(self._batch_size_update,feed_dict={self.new_batch_size:batch_size_value})
 
     def assign_new_max_source_sen_num(self,session,max_source_sen_num_value):
         session.run(self._max_source_sen_num_update,feed_dict={self.new_max_source_sen_num:max_source_sen_num_value})
