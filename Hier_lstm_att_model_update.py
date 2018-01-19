@@ -2,13 +2,14 @@
 import tensorflow as tf
 
 class RNN_Model(object):
-    def __init__(self,config,is_training=True):
+    def __init__(self,config):
 
         self.batch_size=tf.Variable(0,dtype=tf.int32,trainable=False)
         hidden_neural_size = config.hidden_neural_size  # 隐藏层神经元的的个数
         vocabulary_size = config.vocabulary_size  # 单词的个数
         embed_dim = config.embed_dim  # word2Vec的的维度
         hidden_layer_num = config.hidden_layer_num  # 神经元的层数
+        max_grad_norm=config.max_grad_norm
         self.sen_mask = tf.placeholder(tf.int32, [self.batch_size, self.max_source_sen_num])       #这个变量准备一下。。。。。。。
         self.new_batch_size = tf.placeholder(tf.int32, shape=[], name="new_batch_size")
         self._batch_size_update = tf.assign(self.batch_size, self.new_batch_size)
@@ -180,7 +181,7 @@ class RNN_Model(object):
         for no_sen in range(self.max_target_sen_num):
             if no_sen==0:
                 h_t_1=output_from_sent_encode_doc[-1][-1]  #16X1000
-            else
+            else:
                 h_t_1=h_t_target_sen[no_sen-1]
 
             word_decodes.append(h_t_1)
@@ -207,8 +208,7 @@ class RNN_Model(object):
         self.lr = tf.Variable(0.0,trainable=False)
 
         tvars = tf.trainable_variables()
-        grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars),
-                                      config.max_grad_norm)
+        grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, tvars),max_grad_norm)
 
         optimizer = tf.train.GradientDescentOptimizer(self.lr)
         optimizer.apply_gradients(zip(grads, tvars))
