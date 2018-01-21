@@ -2,7 +2,7 @@
 import tensorflow as tf
 
 class RNN_Model(object):
-    def __init__(self,config,is_training=True):
+    def __init__(self,config,is_training,session):
         self.batch_size=config.batch_size
         # self.batch_size = tf.Variable(0,dtype=tf.int32,trainable=False)
         hidden_neural_size = config.hidden_neural_size  # 隐藏层神经元的的个数
@@ -13,8 +13,9 @@ class RNN_Model(object):
         # self.new_batch_size = tf.placeholder(tf.int32, shape=[], name="new_batch_size")
         # self._batch_size_update = tf.assign(self.batch_size, self.new_batch_size)
         #这是编码阶段用到的
-        self.max_source_sen_num = tf.Variable(0,  dtype=tf.int32,trainable=False)
-        self.max_source_word_num = tf.Variable(0, dtype=tf.int32, trainable=False)
+
+        self.max_source_sen_num = tf.Variable(initial_value=0, dtype=tf.int32,trainable=False,)
+        self.max_source_word_num = tf.Variable(initial_value=0, dtype=tf.int32, trainable=False)
 
         self.train_source_set=tf.placeholder(tf.int32,[None,None,None])
         # self.train_source_set=tf.placeholder(tf.int32,[self.batch_size,self.max_source_sen_num,self.max_source_word_num])
@@ -30,9 +31,10 @@ class RNN_Model(object):
         self.max_target_sen_num = tf.Variable(0, dtype=tf.int32, trainable=False)
         self.max_target_word_num = tf.Variable(0, dtype=tf.int32, trainable=False)
 
-        self.train_target_set = tf.placeholder(tf.int32,[None,None,None])
+        self.train_target_set = tf.placeholder(tf.int64,[None,None,None])
         # self.train_target_set = tf.placeholder(tf.int32,[self.batch_size, self.max_target_sen_num, self.max_target_word_num])
         self.mask_train_target_set = tf.placeholder(tf.int32, [None,None,None])
+        self.mask_train_target_set_float=tf.placeholder(tf.float32, [None,None,None])
         # self.mask_train_target_set = tf.placeholder(tf.int32, [self.max_target_sen_num, self.max_target_word_num,self.batch_size])
         self.new_max_target_sen_num = tf.placeholder(tf.int32, shape=[], name="new_max_target_sen_num")
         self._max_target_sen_num_update = tf.assign(self.max_target_sen_num, self.new_max_target_sen_num)
@@ -68,22 +70,26 @@ class RNN_Model(object):
         self._initial_state_sent_decode_word = sent_decode_word_cell.zero_state(self.batch_size, dtype=tf.float32)
 
 
+        if config.isInitializer==1:
+            session.run(tf.global_variables_initializer())
+
+        config.isInitializer=0
         #编码阶段
         input_for_word_encode_sent = []
         length_array_input_for_word_encode_sent = []
         with tf.device("/cpu:0"), tf.name_scope("source_embedding_layer"):
             embedding = tf.get_variable("embedding", [vocabulary_size, embed_dim], dtype=tf.float32)
-            for no_sen in range(self.max_source_sen_num):
+            for no_sen in range(tf.cast(self.max_source_sen_num,tf.int32).eval()):
                 input_for_word_encode_sent.append(tf.nn.embedding_lookup(embedding, self.train_source_set[:, no_sen,:]))
                 length_array_input_for_word_encode_sent.append(tf.reduce_sum(self.mask_train_source_set[no_sen],axis=0))   #计算每一句话的长度 就是seq_length
 
         output_from_word_encode_sent = []                                                 #单词到句子编码的输出
         state_word_encode_sent = self._initial_state_word_encode_sent                     #state.shape = [layer_num, 2, batch_size, hidden_size],
         with tf.variable_scope("word_encode_sent"):
-            for no_sen in range(self.max_source_sen_num):
+            for no_sen in range(tf.cast(self.max_source_sen_num,tf.int32).eval()):
                if no_sen > 0:
                    tf.get_variable_scope().reuse_variables()
-            outputs, state_word_encode_sent = tf.nn.dynamic_rnn(word_encode_sent_cell,
+               outputs, state_word_encode_sent = tf.nn.dynamic_rnn(word_encode_sent_cell,
                                                                       inputs=input_for_word_encode_sent[no_sen],
                                                                       sequence_length=length_array_input_for_word_encode_sent[no_sen],
                                                                       initial_state=state_word_encode_sent,
@@ -96,7 +102,7 @@ class RNN_Model(object):
         length_array_input_for_sent_encode_doc = []                      #就是一个list
         for no_batch in range(self.batch_size):
             sen_num = 0
-            for no_sen in range(self.max_source_sen_num):
+            for no_sen in range(tf.cast(self.max_source_sen_num,tf.int32).eval()):
                 sen_num+=self.mask_train_source_set[no_sen][0][no_batch]
             length_array_input_for_sent_encode_doc.append(sen_num)
 
@@ -120,7 +126,7 @@ class RNN_Model(object):
         input_for_sent_decode_word = []
         length_array_input_for_sent_decode_word = []
         with tf.device("/cpu:0"), tf.name_scope("target_embedding_layer"):
-            for no_sen in range(self.max_target_sen_num):
+            for no_sen in range(tf.cast(self.max_target_sen_num,tf.int32).eval()):
                 input_for_sent_decode_word.append(tf.nn.embedding_lookup(embedding, self.train_target_set[:, no_sen, :]))
                 length_array_input_for_sent_decode_word.append(tf.reduce_sum(self.mask_train_target_set[no_sen], axis=0))  # 计算每一句话的长度 就是seq_length
 
@@ -128,7 +134,7 @@ class RNN_Model(object):
         length_array_input_for_doc_decode_sent = []  # 就是一个list
         for no_batch in range(self.batch_size):
             sen_num = 0
-            for no_sen in range(self.max_target_sen_num):
+            for no_sen in range(tf.cast(self.max_target_sen_num,tf.int32).eval()):
                 sen_num += self.mask_train_target_set[no_sen][0][no_batch]
             length_array_input_for_doc_decode_sent.append(sen_num)
         # state_doc_decode_sent  = self._initial_state_doc_decode_sent
@@ -140,7 +146,7 @@ class RNN_Model(object):
         h_t_Target_sen = []  #将sent_decode_word中的每个时间步的最后一层的输出ht保存为一个元素 放在这个列表里面  所以这个列表的长度就是文章的最大句子数 整体的shape是[max_sen_time,batch_size, max_word_time, cell_state_size]
         train_source_each_sent=tf.transpose(train_source_each_sent, [1,0,2])   #现在train_source_each_sent的shapes是[max_sen_time,batch_size,cell_state_size]
         sen_mask = tf.transpose(self.sen_mask,[1,0])     #shape是[max_sen_time,batch_size]
-        for no_sen in range(self.max_target_sen_num):
+        for no_sen in range(tf.cast(self.max_target_sen_num,tf.int32).eval()):
             state_sent_decode_word = state_doc_decode_sent
             with tf.variable_scope("sent_decode_word"):
                 if no_sen > 0:
@@ -154,7 +160,7 @@ class RNN_Model(object):
                 input_for_doc_decode_sent_at_tt = state_sent_decode_word[-1][-1]  # 这个时间步的doc_decode_sent的输入
 
                 vs = []
-                for no_sen_2 in range(self.max_target_sen_num):
+                for no_sen_2 in range(tf.cast(self.max_target_sen_num,tf.int32).eval()):
                     with tf.variable_scope("decode_RNN_attention"):
                         if no_sen > 0 or no_sen_2 > 0:
                             tf.get_variable_scope().reuse_variables()
@@ -170,7 +176,7 @@ class RNN_Model(object):
                         vs.append(vi)
 
                 vs_sum = tf.add_n(vs)
-                mt = tf.add_n([vs[i] * train_source_each_sent[i] for i in range(self.max_target_sen_num)]) / vs_sum  #train_source_each_sent[i]的shape是
+                mt = tf.add_n([vs[i] * train_source_each_sent[i] for i in range(tf.cast(self.max_target_sen_num,tf.int32).eval())]) / vs_sum  #train_source_each_sent[i]的shape是
                 with tf.variable_scope("doc_decode_sent"):
                     if no_sen > 0:
                         tf.get_variable_scope().reuse_variables()
@@ -184,10 +190,12 @@ class RNN_Model(object):
 
                     h_t_target_sen.append(output)  #output的shape是[batchsize,cell_state_size] padding的位置都是0
 
+        print(tf.cast(self.max_target_sen_num,tf.int32).eval() * tf.cast(self.max_target_word_num,tf.int32).eval())
+
 
         word_decodes = []
         #计算误差
-        for no_sen in range(self.max_target_sen_num):
+        for no_sen in range(tf.cast(self.max_target_sen_num,tf.int32).eval()):
             if no_sen==0:
                 h_t_1=output_from_sent_encode_doc[-1][-1]  #16X1000
             else:
@@ -197,20 +205,22 @@ class RNN_Model(object):
             # 获取第no_sen句子的在word水平的解码的输出
             target_sen = h_t_Target_sen[no_sen]  # shape是[batch_size, max_word_time, cell_state_size]
             target_sen = tf.transpose(target_sen,perm=[1, 0, 2])  # shape是[max_word_time,batch_size,cell_state_size]
-            for no_word in range(self.max_target_word_num-1):
+            for no_word in range(tf.cast(self.max_target_word_num,tf.int32).eval()-1):
                 word_decodes.append(target_sen[no_word])
 
-        targets = tf.reshape(self.train_target_set, [self.batch_size, self.max_target_sen_num * self.max_target_word_num])
-        targets = [targets[:, i] for i in range(self.max_target_sen_num * self.max_target_word_num)]
-        targets=tf.reshape(targets,[-1,1])
+        targets = tf.reshape(self.train_target_set, [self.batch_size, tf.cast(self.max_target_sen_num,tf.int32).eval() * tf.cast(self.max_target_word_num,tf.int32).eval()])
+        targets = [targets[:, i] for i in range(tf.cast(self.max_target_sen_num,tf.int32).eval() * tf.cast(self.max_target_word_num,tf.int32).eval())]
+        targets=tf.convert_to_tensor(targets,dtype=tf.int64)
+        targets=tf.reshape(targets,[-1])
         word_decodes=tf.reshape(word_decodes,[-1,hidden_neural_size])
         with tf.name_scope("Softmax_layer_and_output"):
             softmax_w = tf.get_variable("softmax_w",[hidden_neural_size,vocabulary_size],dtype=tf.float32)
             self.logits = tf.matmul(word_decodes,softmax_w)
 
         with tf.name_scope("loss"):
-            weights = tf.reshape(self.mask_train_target_set, [-1,1])
-            self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(self.logits+1e-10,targets)
+            weights = tf.reshape(self.mask_train_target_set_float, [-1,1])
+
+            self.loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits+1e-10,labels=targets)
             self.cost = tf.reduce_sum(self.loss*weights)/self.batch_size
 
         self.lr = tf.Variable(0.0,trainable=False)

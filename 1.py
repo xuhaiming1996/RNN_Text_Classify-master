@@ -1,0 +1,4 @@
+(LSTMStateTuple(c=<tf.Tensor 'model/word_encode_sent/rnn_5/while/Exit_2:0' shape=(16, 1000) dtype=float32>, h=<tf.Tensor 'model/word_encode_sent/rnn_5/while/Exit_3:0' shape=(16, 1000) dtype=float32>),
+LSTMStateTuple(c=<tf.Tensor 'model/word_encode_sent/rnn_5/while/Exit_4:0' shape=(16, 1000) dtype=float32>, h=<tf.Tensor 'model/word_encode_sent/rnn_5/while/Exit_5:0' shape=(16, 1000) dtype=float32>),
+LSTMStateTuple(c=<tf.Tensor 'model/word_encode_sent/rnn_5/while/Exit_6:0' shape=(16, 1000) dtype=float32>, h=<tf.Tensor 'model/word_encode_sent/rnn_5/while/Exit_7:0' shape=(16, 1000) dtype=float32>),
+LSTMStateTuple(c=<tf.Tensor 'model/word_encode_sent/rnn_5/while/Exit_8:0' shape=(16, 1000) dtype=float32>, h=<tf.Tensor 'model/word_encode_sent/rnn_5/while/Exit_9:0' shape=(16, 1000) dtype=float32>))

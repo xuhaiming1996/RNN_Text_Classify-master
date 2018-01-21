@@ -31,12 +31,12 @@ flags.DEFINE_integer('check_point_every',1,'checkpoint every num epoch ')  #每�
 flags.DEFINE_integer('max_source_sen_num',-1,'源文件最大的句子数')
 flags.DEFINE_integer('max_source_word_num',-1,'源文件最长的一句话包含的单词数')
 
-flags.DEFINE_integer('max_target_sen_num' , -1 , '源文件最大的句子数')
+flags.DEFINE_integer('max_target_sen_num' ,-1 , '源文件最大的句子数')
 flags.DEFINE_integer('max_target_word_num' ,-1 , '源文件最长的一句话包含的单词数')
 
 flags.DEFINE_string('source_dir','data/train_source','path of train_source')
 flags.DEFINE_string('target_dir','data/train_target','path of train_target')
-
+flags.DEFINE_string('isInitializer',1,'用于判断是否进行初始化，1为进行 0 为不进行')
 
 class Config(object):                           #配置模型需要的参数  这个里面只存放和模型相关的参数
 
@@ -54,7 +54,8 @@ class Config(object):                           #配置模型需要的参数  �
     max_source_word_num=FLAGS.max_source_word_num
     max_target_sen_num = FLAGS.max_target_sen_num
     max_target_word_num = FLAGS.max_target_word_num
-    batch_size=FLAGS.batch_size
+    batch_size = FLAGS.batch_size
+    isInitializer = FLAGS.isInitializer
 
 
 
@@ -70,8 +71,8 @@ def train():
     stop_target = 0
     with tf.Graph().as_default(), tf.Session() as session:
         initializer = tf.random_uniform_initializer(-1 * FLAGS.initial, 1 * FLAGS.initial)
-        with tf.variable_scope("model",initializer=initializer):
-            model = RNN_Model(config=config,is_training=True)
+        with tf.variable_scope("model",reuse=None,initializer=initializer):
+            model = RNN_Model(config=config,is_training=True,session=session)
         # add checkpoint
         print("######################################")
         checkpoint_dir = os.path.abspath(os.path.join(config.out_dir, "checkpoints"))
@@ -79,16 +80,16 @@ def train():
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         saver = tf.train.Saver(tf.all_variables())
-        tf.initialize_all_variables().run()
-        global_steps = 1
 
-        for i in config.num_epoch:
+        global_steps = 1
+        session.run(tf.global_variables_initializer())
+        for i in range(config.num_epoch):
             f_source=open(FLAGS.source_dir,'r',encoding="UTF-8") #获取源文件的文件指针
             f_target=open(FLAGS.target_dir,'r',encoding="UTF-8") #获得目标文件的指针
             num_batch=0 #用于记录这次迭代中的batch的个数
             while stop_source==0 and stop_target==0:#当整个文件还没结束....
                 train_source_set, mask_train_source_set, length_array_eachdoc_source, max_source_sen_num, max_source_word_num, batch_size_source, f_source, stop_source ,sen_mask_source = data_helper_source.load_data(f_source, config.batch_size)
-                train_target_set, mask_train_target_set, length_array_eachdoc_target, max_target_sen_num, max_target_word_num, batch_size_target, f_target, stop_target ,sen_mask_target = data_helper_target.load_data(f_target, config.batch_size)
+                train_target_set, mask_train_target_set, length_array_eachdoc_target, max_target_sen_num, max_target_word_num, batch_size_target, f_target, stop_target ,sen_mask_target ,mask_train_target_set_float= data_helper_target.load_data(f_target, config.batch_size,config.vocabulary_size)
                 if stop_source == 1 or stop_target == 1: #为了防止特殊情况，最后一个batch不进行计算 同时又可以保证我们所有的batch_size都是一样的
                     f_source.close()
                     f_target.close()
@@ -103,7 +104,6 @@ def train():
                     num_batch += 1
                     model.assign_new_lr(session, config.lr)
 
-
                     model.assign_new_max_source_word_num(session,max_source_word_num)
                     model.assign_new_max_source_sen_num(session,max_source_sen_num)
 
@@ -117,6 +117,7 @@ def train():
 
                     feed_dict[model.train_target_set] = train_target_set
                     feed_dict[model.mask_train_target_set] = mask_train_target_set
+                    feed_dict[model.mask_train_target_set_float] = mask_train_target_set_float
 
                     fetches = [model.cost, model.train_op]
                     cost = run_batch(session,feed_dict,fetches,global_steps)
