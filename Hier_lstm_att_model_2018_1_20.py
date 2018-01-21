@@ -13,15 +13,15 @@ class RNN_Model(object):
         # self.new_batch_size = tf.placeholder(tf.int32, shape=[], name="new_batch_size")
         # self._batch_size_update = tf.assign(self.batch_size, self.new_batch_size)
         #这是编码阶段用到的
-        self.max_source_sen_num = 6
-        self.max_source_word_num = 31
+        self.max_source_sen_num = config.max_source_sen_num
+        self.max_source_word_num = config.max_source_word_num
         self.train_source_set = tf.placeholder(tf.int32,[self.batch_size, self.max_source_sen_num, self.max_source_word_num])
         self.mask_train_source_set = tf.placeholder(tf.int32, [self.max_source_sen_num, self.max_source_word_num,self.batch_size])
 
 
         #解码阶段用到的
-        self.max_target_sen_num =6
-        self.max_target_word_num = 32
+        self.max_target_sen_num =config.max_target_sen_num
+        self.max_target_word_num =config.max_target_word_num
 
         self.train_target_set = tf.placeholder(tf.int32, [self.batch_size, self.max_target_sen_num, self.max_target_word_num])
         self.mask_train_target_set_float = tf.placeholder(tf.float32, [self.max_target_sen_num, self.max_target_word_num,

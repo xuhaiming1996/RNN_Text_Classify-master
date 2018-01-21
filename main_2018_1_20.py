@@ -1,5 +1,5 @@
-import data_helper_source
-import  data_helper_target
+import data_helper_source_2018_1_20
+import  data_helper_target_2018_1_20
 # file_source="##源文件##"
 # file_target="###目标文件###"
 from  Hier_lstm_att_model_2018_1_20 import RNN_Model
@@ -8,6 +8,11 @@ import numpy as np
 import os
 import time
 import datetime
+try:
+    from itertools import izip
+except ImportError:
+    izip=zip
+    
 
 
 flags =tf.app.flags
@@ -59,16 +64,47 @@ class Config(object):                           #配置模型需要的参数  �
 
 
 
-def run_batch(session,feed_dict,fetches,global_steps):
-    cost,_ = session.run(fetches, feed_dict)
-    return cost
+def run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoint_prefix):
+    num_batch=0
+    for source,target in zip(  data_helper_source_2018_1_20.batch_iter(data_source, FLAGS.batch_size), data_helper_target_2018_1_20.batch_iter(data_target,FLAGS.batch_size)):
+        sen_mask, train_source_set, mask_train_source_set=source
+        train_target_set, mask_train_target_set, mask_train_target_set_float=target
+        num_batch+=1
+        feed_dict = {}
+        feed_dict[model.sen_mask] = sen_mask
+        feed_dict[model.train_source_set] = train_source_set
+        feed_dict[model.mask_train_source_set] = mask_train_source_set
+
+        feed_dict[model.train_target_set] = train_target_set
+        feed_dict[model.mask_train_target_set] = mask_train_target_set
+        feed_dict[model.mask_train_target_set_float] = mask_train_target_set_float
+        feed_dict[model.lr] = 0.1
+        fetches = [model.cost, model.train_op]
+        cost, _ = session.run(fetches, feed_dict)
+        print("cost_debug:", cost)
+        if num_batch % 1000 == 0:  # 在每次迭代中没1000个batch保存一次参数
+            # path = saver.save(session, checkpoint_prefix, global_steps)
+            # print("num_bath_%i of %i ecpo, Saved model chechpoint to %s\n" % (num_batch, global_steps, path))
+            print("num_bath_%i of %i ecpo, train cost is: %f" % (num_batch, global_steps, cost))
+
+    global_steps += 1
+    return global_steps
 
 
 def train():
     print("loading the dataset...")
     config = Config()
-    stop_source = 0
-    stop_target = 0
+    # data_source的元素  train_source_set, mask_train_source_set, length_array_eachdoc_source, max_source_sen_num, max_source_word_num, num_doc, sen_mask )
+    data_source = data_helper_source_2018_1_20.load_data(FLAGS.source_dir)  # 获取源文件的相关数据
+    # data_target的元素  train_target_set, mask_train_target_set, length_array_eachdoc_target, max_target_sen_num, max_target_word_num, num_doc, sen_mask, mask_train_target_set_float
+    data_target = data_helper_target_2018_1_20.load_data(FLAGS.target_dir,FLAGS.vocabulary_size)
+    config.max_source_sen_num = data_source[3]
+    config.max_source_word_num = data_source[4]
+    config.max_target_sen_num =  data_target[3]
+    config.max_target_word_num = data_target[4]
+    print( config.max_source_sen_num,config.max_source_word_num,config.max_target_sen_num,config.max_target_word_num)
+    num_doc=data_source[5]
+    
     with tf.Graph().as_default(), tf.Session() as session:
         initializer = tf.random_uniform_initializer(-1 * FLAGS.initial, 1 * FLAGS.initial)
         with tf.variable_scope("model",reuse=None,initializer=initializer):
@@ -80,56 +116,21 @@ def train():
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         saver = tf.train.Saver(tf.all_variables())
-
         global_steps = 1
         session.run(tf.global_variables_initializer())
+        begin_time=int(time.time())
+
         for i in range(config.num_epoch):
-            f_source=open(FLAGS.source_dir,'r',encoding="UTF-8") #获取源文件的文件指针
-            f_target=open(FLAGS.target_dir,'r',encoding="UTF-8") #获得目标文件的指针
-            num_batch=0 #用于记录这次迭代中的batch的个数
-            while stop_source==0 and stop_target==0:#当整个文件还没结束....
-                train_source_set, mask_train_source_set, length_array_eachdoc_source, max_source_sen_num, max_source_word_num, batch_size_source, f_source, stop_source ,sen_mask_source = data_helper_source.load_data(f_source, config.batch_size)
-                train_target_set, mask_train_target_set, length_array_eachdoc_target, max_target_sen_num, max_target_word_num, batch_size_target, f_target, stop_target ,sen_mask_target ,mask_train_target_set_float= data_helper_target.load_data(f_target, config.batch_size,config.vocabulary_size)
-                if stop_source == 1 or stop_target == 1: #为了防止特殊情况，最后一个batch不进行计算 同时又可以保证我们所有的batch_size都是一样的
-                    f_source.close()
-                    f_target.close()
-                    break
+            print("the %d epoch training..."%(i+1))
+            global_steps=run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoint_prefix)
+            # if global_steps% config.checkpoint_every==0:
+            #     path = saver.save(session,checkpoint_prefix,global_steps)
+            #     print("Saved model chechpoint to{}\n".format(path))
 
-                if batch_size_source == batch_size_target:
-                    #数据读取正常
-                    print("the %d epoch training..." % (i + 1))
-                    num_batch += 1
-                    feed_dict = {}
-                    feed_dict[model.sen_mask] = sen_mask_source
-                    feed_dict[model.train_source_set] = train_source_set
-                    feed_dict[model.train_source_set] = train_source_set
-                    feed_dict[model.mask_train_source_set] = mask_train_source_set
-
-                    feed_dict[model.train_target_set] = train_target_set
-                    feed_dict[model.mask_train_target_set] = mask_train_target_set
-                    feed_dict[model.mask_train_target_set_float] = mask_train_target_set_float
-                    # feed_dict[model.max_source_sen_num] = max_source_sen_num
-                    # feed_dict[model.max_source_word_num] = max_source_word_num
-                    # feed_dict[model.max_target_sen_num] = max_target_sen_num
-                    # feed_dict[model.max_target_word_num] = max_target_word_num
-                    feed_dict[model.lr] = 0.1
-
-                    fetches = [model.cost, model.train_op]
-                    cost = run_batch(session,feed_dict,fetches,global_steps)
-                    print("cost_debug:",cost)
-                    if num_batch % 1000 == 0:#在每次迭代中没1000个batch保存一次参数
-                        path = saver.save(session, checkpoint_prefix, global_steps)
-                        print("num_bath_%i of %i ecpo, Saved model chechpoint to %s\n" % (num_batch,global_steps,path))
-                        print("num_bath_%i of %i ecpo, train cost is: %f" % (num_batch,global_steps,cost))
-
-                else:
-                    print("这次读取的数据异常，出现batch_size_source==batch_size_target")
-
-            if i % config.checkpoint_every == 0:#数据遍历结束后 保存数组
-                path = saver.save(session, checkpoint_prefix, global_steps)
-                print("Saved model chechpoint to{}\n".format(path))
-            global_steps+=1
-
+        print("the train is finished")
+        end_time=int(time.time())
+        print("training takes %d seconds already\n"%(end_time-begin_time))
+        print("the test data accuracy is %f"%test_accuracy)
         print("program end!")
 
 def main(_):
