@@ -1,5 +1,6 @@
 
 import tensorflow as tf
+import numpy as np
 
 class RNN_Model(object):
     def __init__(self,config):
@@ -184,9 +185,11 @@ class RNN_Model(object):
                     # new_state_doc_decode_sent = []
                     # print(state_doc_decode_sent)
                     for no_lay in range(self.hidden_layer_num):
-                        state_doc_decode_sent[no_lay][0]= tf.reshape(sen_mask[no_sen],[-1,1]) * state_doc_decode_sent[no_lay][0]
-                        state_doc_decode_sent[no_lay][1]= tf.reshape(sen_mask[no_sen],[-1,1]) * state_doc_decode_sent[no_lay][1]
-
+                        new_state_doc_decode_sent=np.array(state_doc_decode_sent)
+                        new_state_doc_decode_sent[no_lay][0]= tf.reshape(sen_mask[no_sen],[-1,1]) * new_state_doc_decode_sent[no_lay][0]
+                        new_state_doc_decode_sent[no_lay][1]= tf.reshape(sen_mask[no_sen],[-1,1]) * new_state_doc_decode_sent[no_lay][1]
+                    print(np.array(new_state_doc_decode_sent[3][1]))
+                    state_doc_decode_sent=tuple(new_state_doc_decode_sent)
                     # state_doc_decode_sent = new_state_doc_decode_sent
                     #这里改一下-----------------------------------------------------------------------------------------------------测试一下
                     # sent_decode = tf.concat([tf.convert_to_tensor(
