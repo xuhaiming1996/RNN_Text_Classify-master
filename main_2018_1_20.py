@@ -79,12 +79,13 @@ def run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoin
         feed_dict[model.mask_train_target_set] = mask_train_target_set
         feed_dict[model.mask_train_target_set_float] = mask_train_target_set_float
         feed_dict[model.lr] = 0.1
-        fetches = [model.cost, model.train_op,model.loss,model.length_array_input_for_sent_encode_doc,model.length_array_input_for_word_encode_sent]
-        cost, _ ,loss,length_array_input_for_sent_encode_doc,length_array_input_for_word_encode_sent= session.run(fetches, feed_dict)
+        fetches = [model.cost, model.train_op,model.loss,model.length_array_input_for_sent_encode_doc,model.length_array_input_for_word_encode_sent,model.outputs]
+        cost, _ ,loss,length_array_input_for_sent_encode_doc,length_array_input_for_word_encode_sent,outputs= session.run(fetches, feed_dict)
         print("cost_debug:", cost)
         print("model.loss",loss)
         print("length_array_input_for_sent_encode_doc",length_array_input_for_sent_encode_doc)
-        print("input_for_word_encode_sent",length_array_input_for_word_encode_sent)
+        print("length_array_input_for_word_encode_sent",length_array_input_for_word_encode_sent)
+        print("outputs",outputs)
         if num_batch % 1000 == 0:  # 在每次迭代中没1000个batch保存一次参数
             # path = saver.save(session, checkpoint_prefix, global_steps)
             # print("num_bath_%i of %i ecpo, Saved model chechpoint to %s\n" % (num_batch, global_steps, path))

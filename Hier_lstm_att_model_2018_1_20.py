@@ -9,7 +9,7 @@ class RNN_Model(object):
         vocabulary_size = config.vocabulary_size  # 单词的个数
         embed_dim = config.embed_dim  # word2Vec的的维度
         self.hidden_layer_num = config.hidden_layer_num  # 神经元的层数
-        max_grad_norm =config.max_grad_norm
+        max_grad_norm =config.max_grad_norm              #搞明白这个原理 适当更改
         # self.new_batch_size = tf.placeholder(tf.int32, shape=[], name="new_batch_size")
         # self._batch_size_update = tf.assign(self.batch_size, self.new_batch_size)
         #这是编码阶段用到的
@@ -79,21 +79,20 @@ class RNN_Model(object):
         #加上--------------------------------测试的东西
         output_from_word_encode_sent = []  # 单词到句子编码的输出
         state_word_encode_sent = self._initial_state_word_encode_sent  # state.shape = [layer_num, 2, batch_size, hidden_size],
-        self.length_array_input_for_word_encode_sent = length_array_input_for_word_encode_sent[0]
+        self.length_array_input_for_word_encode_sent = length_array_input_for_word_encode_sent[9]
+
         with tf.variable_scope("word_encode_sent"):
             for no_sen in range(self.max_source_sen_num):
+                state_word_encode_sent = self._initial_state_word_encode_sent  # state.shape = [layer_num, 2, batch_size, hidden_size],
                 if no_sen > 0:
                     tf.get_variable_scope().reuse_variables()
                 outputs, state_word_encode_sent = tf.nn.dynamic_rnn(word_encode_sent_cell,
                                                                     inputs=input_for_word_encode_sent[no_sen],
-                                                                    sequence_length=
-                                                                    length_array_input_for_word_encode_sent[no_sen],
+                                                                    sequence_length=length_array_input_for_word_encode_sent[no_sen],
                                                                     initial_state=state_word_encode_sent,
                                                                     time_major=False)
-                output_from_word_encode_sent.append(
-                    state_word_encode_sent[-1][1])  # state_word_encode_sent[-1][1]就是ht shape为[batch_size,hidden_dim]
+                output_from_word_encode_sent.append(state_word_encode_sent[-1][1])  # state_word_encode_sent[-1][1]就是ht shape为[batch_size,hidden_dim]
 
-        print(state_word_encode_sent)
         # train_source_each_sent=[]   #相当于matlab的source_each_sent   里买你保存的c_t和h_t 整体的shape是 [batch_size, max_time, cell_state_size]
         # output_from_sent_encode_doc = []                                             # 4层的要全部保存下来 包括c_t和h_t
         state_sent_encode_doc = self._initial_state_sent_encode_doc
@@ -105,7 +104,7 @@ class RNN_Model(object):
             length_array_input_for_sent_encode_doc.append(sen_num)
 
         self.length_array_input_for_sent_encode_doc = length_array_input_for_sent_encode_doc
-        #加上——————————————获取length_array_input_for_sent_encode_doc
+
 
         # 注意 output_from_word_encode_sent的shape:[max_sen_time, batch_size, cell_state_size]  但是传进去的需要是[batch_size, max_sen_time, cell_state_size]
         output_from_word_encode_sent = tf.transpose(output_from_word_encode_sent, [1, 0, 2])
@@ -118,6 +117,7 @@ class RNN_Model(object):
             train_source_each_sent = outputs
             output_from_sent_encode_doc = state_sent_encode_doc
 
+        self.outputs=train_source_each_sent[0][5]
         # 解码阶段
         input_for_sent_decode_word = []
         length_array_input_for_sent_decode_word = []
@@ -154,8 +154,7 @@ class RNN_Model(object):
                                                                     length_array_input_for_sent_decode_word[no_sen],
                                                                     initial_state=state_sent_decode_word,
                                                                     time_major=False)
-                h_t_Target_sen.append(
-                    outputs)  # 每一个outputs的shape都是[batch_size, max_word_time, cell_state_size] padding位置上的输出全是0
+                h_t_Target_sen.append(outputs)  # 每一个outputs的shape都是[batch_size, max_word_time, cell_state_size] padding位置上的输出全是0
                 input_for_doc_decode_sent_at_tt = state_sent_decode_word[-1][-1]  # 这个时间步的doc_decode_sent的输入
 
                 vs = []
