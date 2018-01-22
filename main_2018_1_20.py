@@ -39,8 +39,8 @@ flags.DEFINE_integer('max_source_word_num',-1,'源文件最长的一句话包含
 flags.DEFINE_integer('max_target_sen_num' ,-1 , '源文件最大的句子数')
 flags.DEFINE_integer('max_target_word_num' ,-1 , '源文件最长的一句话包含的单词数')
 
-flags.DEFINE_string('source_dir','data/train_source','path of train_source')
-flags.DEFINE_string('target_dir','data/train_target','path of train_target')
+flags.DEFINE_string('source_dir','data/debug_source','path of train_source')
+flags.DEFINE_string('target_dir','data/debug_target','path of train_target')
 flags.DEFINE_string('isInitializer',1,'用于判断是否进行初始化，1为进行 0 为不进行')
 
 class Config(object):                           #配置模型需要的参数  这个里面只存放和模型相关的参数
@@ -79,9 +79,12 @@ def run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoin
         feed_dict[model.mask_train_target_set] = mask_train_target_set
         feed_dict[model.mask_train_target_set_float] = mask_train_target_set_float
         feed_dict[model.lr] = 0.1
-        fetches = [model.cost, model.train_op]
-        cost, _ = session.run(fetches, feed_dict)
+        fetches = [model.cost, model.train_op,model.loss,model.length_array_input_for_sent_encode_doc,model.length_array_input_for_word_encode_sent]
+        cost, _ ,loss,length_array_input_for_sent_encode_doc,length_array_input_for_word_encode_sent= session.run(fetches, feed_dict)
         print("cost_debug:", cost)
+        print("model.loss",loss)
+        print("length_array_input_for_sent_encode_doc",length_array_input_for_sent_encode_doc)
+        print("input_for_word_encode_sent",length_array_input_for_word_encode_sent)
         if num_batch % 1000 == 0:  # 在每次迭代中没1000个batch保存一次参数
             # path = saver.save(session, checkpoint_prefix, global_steps)
             # print("num_bath_%i of %i ecpo, Saved model chechpoint to %s\n" % (num_batch, global_steps, path))
@@ -104,7 +107,9 @@ def train():
     config.max_target_word_num = data_target[4]
     print( config.max_source_sen_num,config.max_source_word_num,config.max_target_sen_num,config.max_target_word_num)
     num_doc=data_source[5]
-    
+
+    print("文章的个数",num_doc)
+
     with tf.Graph().as_default(), tf.Session() as session:
         initializer = tf.random_uniform_initializer(-1 * FLAGS.initial, 1 * FLAGS.initial)
         with tf.variable_scope("model",reuse=None,initializer=initializer):
