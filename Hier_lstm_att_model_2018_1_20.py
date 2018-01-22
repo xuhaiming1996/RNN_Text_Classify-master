@@ -117,7 +117,7 @@ class RNN_Model(object):
             train_source_each_sent = outputs
             output_from_sent_encode_doc = state_sent_encode_doc
 
-        self.outputs=train_source_each_sent[0][5]
+
         # 解码阶段
         input_for_sent_decode_word = []
         length_array_input_for_sent_decode_word = []
@@ -150,8 +150,7 @@ class RNN_Model(object):
                     tf.get_variable_scope().reuse_variables()
                 outputs, state_sent_decode_word = tf.nn.dynamic_rnn(sent_decode_word_cell,
                                                                     inputs=input_for_sent_decode_word[no_sen],
-                                                                    sequence_length=
-                                                                    length_array_input_for_sent_decode_word[no_sen],
+                                                                    sequence_length=length_array_input_for_sent_decode_word[no_sen],
                                                                     initial_state=state_sent_decode_word,
                                                                     time_major=False)
                 h_t_Target_sen.append(outputs)  # 每一个outputs的shape都是[batch_size, max_word_time, cell_state_size] padding位置上的输出全是0
@@ -184,17 +183,17 @@ class RNN_Model(object):
                         tf.get_variable_scope().reuse_variables()
                     # new_state_doc_decode_sent = []
                     # print(state_doc_decode_sent)
-                    # for no_lay in range(self.hidden_layer_num):
-                    #     c = tf.reshape(sen_mask[no_sen],[-1,1]) * state_doc_decode_sent[no_lay][0]
-                    #     h = tf.reshape(sen_mask[no_sen],[-1,1]) * state_doc_decode_sent[no_lay][1]
-                    #     tuple_c_h = [c,h]
-                    #     new_state_doc_decode_sent.append(tuple_c_h)
-                    #
+                    for no_lay in range(self.hidden_layer_num):
+                        state_doc_decode_sent[no_lay][0]= tf.reshape(sen_mask[no_sen],[-1,1]) * state_doc_decode_sent[no_lay][0]
+                        state_doc_decode_sent[no_lay][1]= tf.reshape(sen_mask[no_sen],[-1,1]) * state_doc_decode_sent[no_lay][1]
+
                     # state_doc_decode_sent = new_state_doc_decode_sent
                     #这里改一下-----------------------------------------------------------------------------------------------------测试一下
-                    sent_decode = tf.concat([tf.convert_to_tensor(
-                        input_for_doc_decode_sent_at_tt * tf.reshape(sen_mask[no_sen], [-1, 1]), dtype=tf.float32), mt],
-                                            1)  # 16X2000
+                    # sent_decode = tf.concat([tf.convert_to_tensor(
+                    #     input_for_doc_decode_sent_at_tt * tf.reshape(sen_mask[no_sen], [-1, 1]), dtype=tf.float32), mt],
+                    #                         1)  # 16X2000
+
+                    sent_decode = tf.concat([input_for_doc_decode_sent_at_tt, mt],1) * tf.reshape(sen_mask[no_sen], [-1, 1]) # 16X2000
                     # print("tf.reshape(sen_mask[no_sen], [-1, 1])",tf.reshape(sen_mask[no_sen], [-1, 1]))
                     # print("input_for_doc_decode_sent_at_tt",input_for_doc_decode_sent_at_tt)
                     # states的shape = [batch_size, n(LSTMStateTuple)]
