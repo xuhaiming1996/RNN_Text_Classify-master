@@ -44,7 +44,7 @@ def read_file(filepath,vocabulary_size):
                 doc_index=doc_index+1
                 article[-1].append(doc_stop)
                 length_array_article[-1]+=1
-                if len(article[-1])>max_target_word_num:
+                if len(article[-1]) > max_target_word_num:
                     max_target_word_num=len(article[-1])
 
                 if max_target_sen_num<len(article):
@@ -54,11 +54,11 @@ def read_file(filepath,vocabulary_size):
                 article=[]
                 length_array_article=[]
         else:
-            text_s.append(sen_stop)
-            if len(text_s) > 41:
+            if len(text_s) > 40:
                 flag=1
                 pass
             else:
+                text_s.append(sen_stop)
                 if max_target_word_num<len(text_s):
                     max_target_word_num=len(text_s)
                 length_array_article.append(len(text_s))
@@ -66,7 +66,7 @@ def read_file(filepath,vocabulary_size):
 
         text_s = f.readline()
 
-
+    print("max_target_word_num",max_target_word_num)
     num_doc=doc_index
     print("目标文件总共",num_doc,"篇文章")
     f.close()

@@ -41,12 +41,12 @@ def read_file(filepath):
                 article=[]
                 length_array_article=[]
         else:
-            if len(text_s)>40:
-                flag=1
+            if len(text_s) > 40:
+                flag = 1
                 pass
             else:
-                if max_source_word_num<len(text_s):
-                    max_source_word_num=len(text_s)
+                if max_source_word_num < len(text_s):
+                    max_source_word_num = len(text_s)
                 length_array_article.append(len(text_s))
                 article.append(text_s)
 

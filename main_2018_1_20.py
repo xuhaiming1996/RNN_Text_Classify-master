@@ -79,11 +79,9 @@ def run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoin
         feed_dict[model.mask_train_target_set] = mask_train_target_set
         feed_dict[model.mask_train_target_set_float] = mask_train_target_set_float
         feed_dict[model.lr] = 0.1
-        fetches = [model.cost, model.train_op,model.loss,model.weights]
-        cost, _ ,loss,weights= session.run(fetches, feed_dict)
+        fetches = [model.cost, model.train_op]
+        cost, _ = session.run(fetches, feed_dict)
         print("cost_debug:", cost)
-        print("model.loss",loss)
-        print("word_decodes",weights)
         # print("outputs",outputs)
         if num_batch % 1000 == 0:  # 在每次迭代中没1000个batch保存一次参数
             # path = saver.save(session, checkpoint_prefix, global_steps)
