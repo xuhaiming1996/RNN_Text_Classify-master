@@ -185,15 +185,14 @@ class RNN_Model(object):
                     # new_state_doc_decode_sent = []
                     # print(state_doc_decode_sent)
 
-                    # for no_lay in range(self.hidden_layer_num):
-                    #     new_state_doc_decode_sent=np.array(state_doc_decode_sent)
-                    #     new_state_doc_decode_sent[no_lay][0]= tf.reshape(sen_mask[no_sen],[-1,1]) * new_state_doc_decode_sent[no_lay][0]
-                    #     new_state_doc_decode_sent[no_lay][1]= tf.reshape(sen_mask[no_sen],[-1,1]) * new_state_doc_decode_sent[no_lay][1]
-                    # print(np.array(new_state_doc_decode_sent[3][1]))
-                    # state_doc_decode_sent=tuple(new_state_doc_decode_sent)
+                    for no_lay in range(self.hidden_layer_num):
+                        new_state_doc_decode_sent=np.array(state_doc_decode_sent)
+                        new_state_doc_decode_sent[no_lay][0]= tf.reshape(sen_mask[no_sen],[-1,1]) * new_state_doc_decode_sent[no_lay][0]
+                        new_state_doc_decode_sent[no_lay][1]= tf.reshape(sen_mask[no_sen],[-1,1]) * new_state_doc_decode_sent[no_lay][1]
+
+                    state_doc_decode_sent=tuple(new_state_doc_decode_sent)
+
                     # state_doc_decode_sent = new_state_doc_decode_sent
-
-
                     # sent_decode = tf.concat([tf.convert_to_tensor(
                     #     input_for_doc_decode_sent_at_tt * tf.reshape(sen_mask[no_sen], [-1, 1]), dtype=tf.float32), mt],
                     #                         1)  # 16X2000
@@ -207,9 +206,8 @@ class RNN_Model(object):
 
                     h_t_target_sen.append(output)  # output的shape是[batchsize,cell_state_size] padding的位置都是0
 
-        print(self.max_target_sen_num * self.max_target_word_num)
-
         word_decodes = []
+        self.h_t_Target_sen=h_t_Target_sen[0][0][4]
         # 计算误差
         for no_sen in range(self.max_target_sen_num):
             if no_sen == 0:
@@ -224,18 +222,23 @@ class RNN_Model(object):
             for no_word in range(self.max_target_word_num - 1):
                 word_decodes.append(target_sen[no_word])
 
+
+
+
         targets = tf.reshape(self.train_target_set,
                              [self.batch_size, self.max_target_sen_num * self.max_target_word_num])
         targets = [targets[:, i] for i in range(self.max_target_sen_num * self.max_target_word_num)]
         # targets = tf.convert_to_tensor(targets, dtype=tf.int64)
         targets = tf.reshape(targets, [-1])
+
+
         weights = tf.reshape(self.mask_train_target_set_float, [-1,1])
 
         word_decodes = tf.reshape(word_decodes, [-1, self.hidden_neural_size])
 
-        word_decodes=word_decodes*weights
+        word_decodes = word_decodes*weights
         with tf.name_scope("Softmax_layer_and_output"):
-            softmax_w = tf.get_variable("softmax_w",[self.hidden_neural_size,vocabulary_size],dtype=tf.float32)
+            softmax_w   = tf.get_variable("softmax_w",[self.hidden_neural_size,vocabulary_size],dtype=tf.float32)
             self.logits = tf.matmul(word_decodes,softmax_w)
 
         with tf.name_scope("loss"):

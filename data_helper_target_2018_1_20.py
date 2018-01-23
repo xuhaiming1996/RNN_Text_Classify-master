@@ -40,6 +40,7 @@ def read_file(filepath,vocabulary_size):
                 flag=0
                 pass
             else:
+
                 doc_index=doc_index+1
                 article[-1].append(doc_stop)
                 length_array_article[-1]+=1
