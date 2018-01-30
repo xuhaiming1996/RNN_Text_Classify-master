@@ -25,7 +25,7 @@ flags.DEFINE_integer('emdedding_dim',1000,'embedding dim')
 flags.DEFINE_integer('hidden_neural_size',1000,'LSTM hidden neural size')
 flags.DEFINE_integer('hidden_layer_num',4,'LSTM hidden layer num')
 flags.DEFINE_float('initial',0.08,'init initial')    #这个初始化参数的范围1---
-flags.DEFINE_integer('num_epoch',8,'num epoch')
+flags.DEFINE_integer('num_epoch',3,'num epoch')
 flags.DEFINE_integer('max_decay_epoch',30,'num epoch')
 flags.DEFINE_integer('max_grad_norm',5,'max_grad_norm')
 
@@ -110,7 +110,7 @@ def train():
 
     with tf.Graph().as_default(), tf.Session() as session:
         initializer = tf.random_uniform_initializer(-1 * FLAGS.initial, 1 * FLAGS.initial)
-        with tf.variable_scope("model",reuse=None,initializer=initializer):
+        with tf.variable_scope("model",reuse=None ,initializer=initializer):
             model = RNN_Model(config=config)
         # add checkpoint
         print("######################################")
@@ -126,14 +126,13 @@ def train():
         for i in range(config.num_epoch):
             print("the %d epoch training..."%(i+1))
             global_steps=run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoint_prefix)
-            # if global_steps% config.checkpoint_every==0:
-            #     path = saver.save(session,checkpoint_prefix,global_steps)
-            #     print("Saved model chechpoint to{}\n".format(path))
+            if global_steps% config.checkpoint_every==0:
+                path = saver.save(session,checkpoint_prefix,global_steps)
+                print("Saved model chechpoint to{}\n".format(path))
 
         print("the train is finished")
         end_time=int(time.time())
         print("training takes %d seconds already\n"%(end_time-begin_time))
-        print("the test data accuracy is %f"%test_accuracy)
         print("program end!")
 
 def main(_):

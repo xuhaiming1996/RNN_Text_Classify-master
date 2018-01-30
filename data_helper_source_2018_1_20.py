@@ -94,5 +94,6 @@ def batch_iter(data_source,batch_size):
         else:
             return_sen_mask =sen_mask[start_index:end_index]
             return_train_source_set = train_source_set[start_index:end_index]
+            return_length_array_eachdoc_source=length_array_eachdoc_source[start_index:end_index]
             return_mask_train_source_set = mask_train_source_set[:,:,start_index:end_index]
-            yield (return_sen_mask,return_train_source_set,return_mask_train_source_set)
+            yield (return_sen_mask,return_train_source_set,return_mask_train_source_set,return_length_array_eachdoc_source)
