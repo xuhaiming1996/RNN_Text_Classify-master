@@ -64,10 +64,11 @@ class Config(object):                           #配置模型需要的参数  �
 
 
 
-def run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoint_prefix):
+def run_epoch(model,session,data_source,data_target):
     num_batch=0
     for source,target in zip(  data_helper_source_2018_1_20.batch_iter(data_source, FLAGS.batch_size), data_helper_target_2018_1_20.batch_iter(data_target,FLAGS.batch_size)):
-        sen_mask, train_source_set, mask_train_source_set=source
+        begin_time = int(time.time())
+        sen_mask, train_source_set, mask_train_source_set,_=source
         train_target_set, mask_train_target_set, mask_train_target_set_float=target
         num_batch+=1
         feed_dict = {}
@@ -82,14 +83,16 @@ def run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoin
         fetches = [model.cost, model.train_op]
         cost, _ = session.run(fetches, feed_dict)
         print("cost_debug:", cost)
+        end_time=int(time.time())
+        print("training a batch %d seconds already"%(end_time-begin_time))
         # print("outputs",outputs)
         if num_batch % 1000 == 0:  # 在每次迭代中没1000个batch保存一次参数
             # path = saver.save(session, checkpoint_prefix, global_steps)
             # print("num_bath_%i of %i ecpo, Saved model chechpoint to %s\n" % (num_batch, global_steps, path))
-            print("num_bath_%i of %i ecpo, train cost is: %f" % (num_batch, global_steps, cost))
+            print("num_bath_%i, train cost is: %f" % (num_batch, cost))
 
-    global_steps += 1
-    return global_steps
+
+
 
 
 def train():
@@ -118,21 +121,28 @@ def train():
         checkpoint_prefix = os.path.join(checkpoint_dir, "model")
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-        saver = tf.train.Saver(tf.all_variables())
-        global_steps = 1
-        session.run(tf.global_variables_initializer())
-        begin_time=int(time.time())
 
-        for i in range(config.num_epoch):
+        global_step = tf.Variable(0, name='global_step', trainable=False)
+        saver = tf.train.Saver(tf.all_variables())
+        session.run(tf.global_variables_initializer())
+
+        ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            print(ckpt.model_checkpoint_path)
+            saver.restore(session, ckpt.model_checkpoint_path)
+
+        start = global_step.eval()
+
+        print("start from:", start)
+
+        for i in range(start,config.num_epoch):
             print("the %d epoch training..."%(i+1))
-            global_steps=run_epoch(model,session,data_source,data_target,global_steps,saver,checkpoint_prefix)
-            if global_steps% config.checkpoint_every==0:
-                path = saver.save(session,checkpoint_prefix,global_steps)
-                print("Saved model chechpoint to{}\n".format(path))
+            run_epoch(model,session,data_source,data_target)
+            global_step.assign(i).eval()
+            path = saver.save(session,checkpoint_prefix,global_step)
+            print("Saved model chechpoint to{}\n".format(path))
 
         print("the train is finished")
-        end_time=int(time.time())
-        print("training takes %d seconds already\n"%(end_time-begin_time))
         print("program end!")
 
 def main(_):
